@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Cash Power Estimator</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background-color: #f5f5f5;
+      margin: 0;
+      padding: 0;
+    }
+    h2 {
+      color: #333;
+      padding: 1rem;
+      text-align: center;
+    }
+    .tabs {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      background-color: #ddd;
+    }
+    .tabs button {
+      padding: 10px 20px;
+      margin: 5px;
+      font-size: 16px;
+      border: none;
+      background-color: #ccc;
+      cursor: pointer;
+    }
+    .tabs button.active {
+      background-color: #007bff;
+      color: white;
+    }
+    .tab-content {
+      display: none;
+      padding: 20px;
+      background: #fff;
+      max-width: 600px;
+      margin: auto;
+      box-shadow: 0 0 10px rgba(0,0,0,0.1);
+      border-radius: 8px;
+    }
+    .tab-content.active {
+      display: block;
+    }
+    input, select, button {
+      width: 90%;
+      max-width: 400px;
+      padding: 10px;
+      margin: 10px auto;
+      display: block;
+      font-size: 16px;
+      box-sizing: border-box;
+    }
+    .output {
+      font-size: 18px;
+      background: #f0f8ff;
+      padding: 15px;
+      border-radius: 6px;
+      margin-top: 10px;
+    }
+  </style>
+</head>
+<body>
+  <h2>💡 Cash Power Cost & Usage Estimator</h2>
+  <div class="tabs" id="tabButtons">
+    <button onclick="showTab('tab1', this)" class="active">📆 Monthly Cost</button>
+    <button onclick="showTab('tab2', this)">📈 Project Cost</button>
+    <button onclick="showTab('tab3', this)">💰 From Amount Paid</button>
+    <button onclick="showTab('tab5', this)">🔁 Project Duration from Amount</button>
+    <button onclick="showTab('tab6', this)">✏️ Calculate Daily Usage</button>
+  </div>
+  <div id="tab1" class="tab-content active">
+    <p><em>Enter your estimated daily kWh usage to see your projected electricity cost for the month.</em></p>
+    <input type="number" id="usageOnly" placeholder="Daily usage in kWh (e.g. 10.83)" />
+    <button onclick="estimateMonthlyFromUsage()">Estimate Monthly Cost</button>
+    <div class="output" id="output1"></div>
+    <canvas id="chart1" style="margin-top:20px;"></canvas>
+  </div>
+  <div id="tab2" class="tab-content">
+    <p><em>Enter your daily kWh usage and choose a time period to calculate your estimated cost.</em></p>
+    <input type="number" id="dailyUse" placeholder="Daily usage (kWh)" />
+    <input type="number" id="duration" placeholder="Enter duration" />
+    <select id="period">
+      <option value="days">Days</option>
+      <option value="weeks">Weeks</option>
+      <option value="months">Months</option>
+      <option value="years">Years</option>
+    </select>
+    <button onclick="projectCost()">Project Cost</button>
+    <div class="output" id="output2"></div>
+  </div>
+  <div id="tab3" class="tab-content">
+    <p><em>Enter how much you spent and how long it lasted to calculate your average daily electricity usage.</em></p>
+    <input type="number" id="amount" placeholder="Amount Paid (Dalasi)" />
+    <input type="number" id="payDuration" placeholder="Number of days it lasted" />
+    <button onclick="estimateFromAmount()">Estimate Usage</button>
+    <div class="output" id="output3"></div>
+  </div>
+  <div id="tab5" class="tab-content">
+    <p><em>Enter the amount you want to spend and either your daily kWh usage or daily Dalasi budget to estimate how long it will last.</em></p>
+    <input type="number" id="creditAmount" placeholder="Amount (Dalasi) you want to spend" />
+    <input type="number" id="usageMode" placeholder="Enter value (Daily kWh or Dalasi)" />
+    <select id="usageUnit">
+      <option value="kwh">Daily Usage (kWh)</option>
+      <option value="dalasi">Daily Spending (Dalasi)</option>
+    </select>
+    <button onclick="estimateMergedDuration()">Estimate Duration</button>
+    <div class="output" id="output5"></div>
+  </div>
+  <div id="tab6" class="tab-content">
+    <p><em>Use your meter readings over time to calculate your average daily usage.</em></p>
+    <input type="number" id="startReading" placeholder="Meter reading at start (kWh)" />
+    <input type="number" id="endReading" placeholder="Meter reading at end (kWh)" />
+    <input type="number" id="readingDays" placeholder="Number of days between readings" />
+    <button onclick="calculateDailyUsage()">Calculate Daily Usage</button>
+    <div class="output" id="output6"></div>
+  </div>
+  <script>
+    const dalasiPerKwh = 13.85;
+
+    function showTab(id, btn) {
+      const tab = document.getElementById(id);
+      const tabs = document.querySelectorAll('.tab-content');
+      const buttons = document.querySelectorAll('#tabButtons button');
+      if (!tab || !btn) return;
+      tabs.forEach(t => t.classList.remove('active'));
+      buttons.forEach(b => b.classList.remove('active'));
+      tab.classList.add('active');
+      btn.classList.add('active');
+    }
+
+    function estimateMonthlyFromUsage() {
+      const usage = parseFloat(document.getElementById("usageOnly").value);
+      const result = document.getElementById("output1");
+      if (isNaN(usage) || usage <= 0) {
+        result.innerHTML = "Please enter a valid daily usage.";
+        return;
+      }
+      const monthlyCost = usage * 30 * dalasiPerKwh;
+      result.innerHTML = `<strong>Estimated Monthly Cost:</strong> ${monthlyCost.toFixed(2)} Dalasi<br><em>(Formula: ${usage} kWh/day × 30 days × 13.85 = ${monthlyCost.toFixed(2)} Dalasi)</em><br><small>Note: 1 kWh = 13.85 Dalasi</small>`;
+
+      const days = Array.from({ length: 30 }, (_, i) => i + 1);
+      const costs = days.map(day => usage * dalasiPerKwh * day);
+
+      const ctx = document.getElementById('chart1').getContext('2d');
+      if (window.usageChart) window.usageChart.destroy();
+      window.usageChart = new Chart(ctx, {
+        type: 'line',
+        data: {
+          labels: days,
+          datasets: [{
+            label: 'Cumulative Cost (Dalasi)',
+            data: costs,
+            fill: false,
+            borderColor: 'rgba(75, 192, 192, 1)',
+            tension: 0.1
+          }]
+        },
+        options: {
+          scales: {
+            x: { title: { display: true, text: 'Day of the Month' } },
+            y: { title: { display: true, text: 'Dalasi' } }
+          }
+        }
+      });
+    }
+
+    function projectCost() {
+      const dailyUsage = parseFloat(document.getElementById("dailyUse").value);
+      const duration = parseFloat(document.getElementById("duration").value);
+      const period = document.getElementById("period").value;
+      const result = document.getElementById("output2");
+      if (isNaN(dailyUsage) || dailyUsage <= 0 || isNaN(duration) || duration <= 0) {
+        result.innerHTML = "Please enter valid daily usage and duration.";
+        return;
+      }
+      let days;
+      switch (period) {
+        case "days": days = duration; break;
+        case "weeks": days = duration * 7; break;
+        case "months": days = duration * 30; break;
+        case "years": days = duration * 365; break;
+        default: days = 0;
+      }
+      const cost = dailyUsage * days * dalasiPerKwh;
+      result.innerHTML = `<strong>Total Cost:</strong> ${cost.toFixed(2)} Dalasi for ${duration} ${period}<br><em>(Formula: ${dailyUsage} kWh/day × ${days} days × 13.85 = ${cost.toFixed(2)} Dalasi)</em><br><small>Note: 1 kWh = 13.85 Dalasi</small>`;
+    }
+
+    function estimateFromAmount() {
+      const amount = parseFloat(document.getElementById("amount").value);
+      const days = parseFloat(document.getElementById("payDuration").value);
+      const result = document.getElementById("output3");
+      if (isNaN(amount) || amount <= 0 || isNaN(days) || days <= 0) {
+        result.innerHTML = "Please enter a valid amount and duration.";
+        return;
+      }
+      const kWh = amount / dalasiPerKwh;
+      const daily = kWh / days;
+      result.innerHTML = `<strong>Total kWh:</strong> ${kWh.toFixed(2)} kWh<br /><strong>Daily Usage:</strong> ${daily.toFixed(2)} kWh/day<br><em>(Formula: ${amount} ÷ 13.85 = ${kWh.toFixed(2)} kWh)</em><br><small>Note: 1 kWh = 13.85 Dalasi</small>`;
+    }
+
+    function estimateMergedDuration() {
+      const total = parseFloat(document.getElementById("creditAmount").value);
+      const usageInput = parseFloat(document.getElementById("usageMode").value);
+      const unit = document.getElementById("usageUnit").value;
+      const result = document.getElementById("output5");
+
+      if (isNaN(total) || total <= 0 || isNaN(usageInput) || usageInput <= 0) {
+        result.innerHTML = "Please enter a valid amount and usage/spending value.";
+        return;
+      }
+
+      if (unit === "kwh") {
+        const totalKwh = total / dalasiPerKwh;
+        const estimatedDays = totalKwh / usageInput;
+        result.innerHTML = `<strong>Total kWh:</strong> ${totalKwh.toFixed(2)} kWh<br /><strong>Estimated Duration:</strong> ${estimatedDays.toFixed(1)} days<br><em>(Formula: ${total} ÷ 13.85 = ${totalKwh.toFixed(2)} kWh)</em><br><small>Note: 1 kWh = 13.85 Dalasi</small>`;
+      } else {
+        const estimatedDays = total / usageInput;
+        const estimatedKwh = total / dalasiPerKwh;
+        result.innerHTML = `<strong>Estimated Duration:</strong> ${estimatedDays.toFixed(1)} days<br /><strong>Total kWh:</strong> ${estimatedKwh.toFixed(2)} kWh<br><em>(Formula: ${total} ÷ ${usageInput} = ${estimatedDays.toFixed(1)} days)</em><br><small>Note: 1 kWh = 13.85 Dalasi</small>`;
+      }
+    }
+
+    function calculateDailyUsage() {
+      const start = parseFloat(document.getElementById("startReading").value);
+      const end = parseFloat(document.getElementById("endReading").value);
+      const days = parseFloat(document.getElementById("readingDays").value);
+      const result = document.getElementById("output6");
+
+      if (isNaN(start) || isNaN(end) || isNaN(days) || days <= 0 || (end - start) < 0) {
+        result.innerHTML = "Please enter valid meter readings and duration.";
+        return;
+      }
+
+      const usage = end - start;
+      const daily = usage / days;
+      result.innerHTML = `<strong>Total Usage:</strong> ${usage.toFixed(2)} kWh<br /><strong>Daily Usage:</strong> ${daily.toFixed(2)} kWh/day<br><em>(Formula: (${end} - ${start}) ÷ ${days} = ${daily.toFixed(2)} kWh/day)</em><br><small>Note: 1 kWh = 13.85 Dalasi</small>`;
+    }
+  </script>
+</body>
+</html>
